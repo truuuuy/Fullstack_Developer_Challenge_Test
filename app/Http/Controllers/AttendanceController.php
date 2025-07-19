@@ -112,6 +112,14 @@ class AttendanceController extends Controller
             'status' => $checkOutStatus
         ]);
 
+        // Simpan ke tabel attendance_histories
+        AttendanceHistory::create([
+            'attendance_id'    => $attendance->id,
+            'employee_id'      => $request->employee_id,
+            'date_attendance'  => $today,
+            'attendance_type'  => 'Absen Keluar',
+        ]);
+
         $employee = Employee::find($request->employee_id);
 
         return redirect()->route('attendance.index')
