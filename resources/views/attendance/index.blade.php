@@ -232,7 +232,7 @@
                                             <td>
                                                 <strong>{{ $attendance->employee->name }}</strong>
                                                 <br>
-                                                <small class="text-muted">ID: {{ $attendance->employee->id }}</small>
+                                                {{-- <small class="text-muted">ID: {{ $attendance->employee->id }}</small> --}}
                                             </td>
                                             <td>{{ \Carbon\Carbon::parse($attendance->date)->format('d M Y') }}</td>
                                             <td>

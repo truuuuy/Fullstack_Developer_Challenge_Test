@@ -21,7 +21,6 @@ class AttendanceHistory extends Model
 
     protected $casts = [
         'date_attendance' => 'datetime',
-        'attendance_type' => 'integer',
     ];
 
     public function employee()

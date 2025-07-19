@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Attendance;
-use App\Models\Employee;
 use Carbon\Carbon;
+use App\Models\Employee;
+use App\Models\Attendance;
+use Illuminate\Http\Request;
+use App\Models\AttendanceHistory;
 
 class AttendanceController extends Controller
 {
@@ -16,7 +17,7 @@ class AttendanceController extends Controller
             ->whereDate('date', Carbon::today())
             ->orderBy('created_at', 'desc')
             ->get();
-            
+
         return view('attendance.index', compact('attendances'));
     }
 
@@ -31,42 +32,53 @@ class AttendanceController extends Controller
         $request->validate([
             'employee_id' => 'required|exists:employees,id',
         ]);
-
+        
         $now = Carbon::now();
         $today = Carbon::today();
-
-        // Check if employee already checked in today
+        
+        // Cek apakah sudah absen hari ini
         $existingAttendance = Attendance::where('employee_id', $request->employee_id)
-            ->whereDate('date', $today)
-            ->first();
-
+        ->whereDate('date', $today)
+        ->first();
+        
         if ($existingAttendance) {
-            return redirect()->back()->with('error', 'Karyawan sudah melakukan absen masuk hari ini!');
+            echo "Sudah melakukan cek in pada hari ini";
         }
-
-        // Determine status based on check-in time
+        
+        // Tentukan status keterlambatan
         $status = $this->determineCheckInStatus($now);
 
-        Attendance::create([
+        // Simpan data kehadiran utama
+        $attendance = Attendance::create([
             'employee_id' => $request->employee_id,
             'date' => $today,
             'check_in_time' => $now->format('H:i:s'),
             'status' => $status
         ]);
 
+
+        // Simpan ke tabel attendance_histories
+        AttendanceHistory::create([
+            'attendance_id'    => $attendance->id,
+            'employee_id'      => $request->employee_id,
+            'date_attendance'  => $today,
+            'attendance_type'  => 'Absen Masuk',
+        ]);
+
         $employee = Employee::find($request->employee_id);
-        
+
         return redirect()->route('attendance.index')
             ->with('success', "Absen masuk berhasil untuk {$employee->name}! Status: {$status}");
     }
 
+
     public function showCheckOutForm()
     {
         // Only show employees who have checked in but not checked out today
-        $employees = Employee::whereHas('attendances', function($query) {
+        $employees = Employee::whereHas('attendances', function ($query) {
             $query->whereDate('date', Carbon::today())
-                  ->whereNotNull('check_in_time')
-                  ->whereNull('check_out_time');
+                ->whereNotNull('check_in_time')
+                ->whereNull('check_out_time');
         })->get();
 
         return view('attendance.checkout', compact('employees'));
@@ -101,7 +113,7 @@ class AttendanceController extends Controller
         ]);
 
         $employee = Employee::find($request->employee_id);
-        
+
         return redirect()->route('attendance.index')
             ->with('success', "Absen keluar berhasil untuk {$employee->name}! Status: {$checkOutStatus}");
     }
@@ -112,31 +124,31 @@ class AttendanceController extends Controller
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->paginate(50);
-            
+
         return view('attendance.logs', compact('logs'));
     }
 
     public function ketepatanAbsensi(Request $request)
     {
-        $query = Attendance::with('employee');
-        
+        $query = AttendanceHistory::with('employee');
+
         if ($request->tanggal) {
-            $query->whereDate('date', $request->tanggal);
+            $query->whereDate('date_attendance', $request->tanggal);
         } else {
             // Default to current month
-            $query->whereMonth('date', Carbon::now()->month)
-                  ->whereYear('date', Carbon::now()->year);
+            $query->whereMonth('date_attendance', Carbon::now()->month)
+                ->whereYear('date_attendance', Carbon::now()->year);
         }
-        
-        $data = $query->orderBy('date', 'desc')->get();
-        
+
+        $data = $query->orderBy('date_attendance', 'desc')->get();
+
         return view('absensi.ketepatan', compact('data'));
     }
 
     private function determineCheckInStatus($checkInTime)
     {
         $lateThreshold = Carbon::today()->setTime(8, 15, 0); // 08:15 AM
-        
+
         return $checkInTime->gt($lateThreshold) ? 'Terlambat' : 'present';
     }
 
@@ -144,18 +156,18 @@ class AttendanceController extends Controller
     {
         $earlyThreshold = Carbon::today()->setTime(16, 0, 0); // 4:00 PM
         $minimumWorkHours = 8;
-        
+
         // Calculate work duration in hours
         $workHours = $checkOutTime->diffInHours($checkInTime);
-        
+
         if ($checkOutTime->lt($earlyThreshold)) {
             return 'Pulang Awal';
         }
-        
+
         if ($workHours < $minimumWorkHours) {
             return 'Jam Kerja Kurang';
         }
-        
+
         return 'Tepat Waktu';
     }
 }

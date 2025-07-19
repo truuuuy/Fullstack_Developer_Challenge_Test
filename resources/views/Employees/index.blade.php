@@ -1,7 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-<a href="{{ route('employees.create') }}" class="btn btn-primary mb-3">Tambah Karyawan</a>
+ <div class="mb-3">
+        <a href="{{ url('/') }}" class="btn btn-secondary">← Kembali ke Halaman Utama</a>
+        <a href="{{ route('employees.create') }}" class="btn btn-primary ms-auto">Tambah Karyawan</a>
+    </div>
 
 <table class="table table-bordered">
     <thead>
